@@ -1,1 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Template Builder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .template-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .template-area {
+            width: 100%;
+            height: 650px;
+            border: 3px solid #e0e0e0;
+            border-radius: 12px;
+            position: relative;
+            background: white;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(26, 1fr);
+            gap: 2px;
+            padding: 10px;
+        }
+
+        .template-area.drag-over {
+            border-color: #4CAF50;
+            background-color: rgba(76, 175, 80, 0.05);
+        }
+
+        .image-slot {
+            border: 2px dashed #e0e0e0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fafafa;
+            transition: all 0.2s ease;
+            position: relative;
+            min-height: 20px;
+        }
+
+        .image-slot:hover {
+            border-color: #2196F3;
+            background: #f0f8ff;
+        }
+
+        .image-slot.occupied {
+            border: 2px solid #4CAF50;
+            background: white;
+            padding: 2px;
+        }
+
+        .image-slot.drag-over {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+            transform: scale(1.05);
+        }
+
+        .slot-number {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 8px;
+            color: #999;
+            background: rgba(255,255,255,0.8);
+            padding: 1px 3px;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        .placed-image {
+            width: 100%;
+            height: 100%;
+            border-radius: 4px;
+            cursor: move;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .placed-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .placed-image:hover {
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 16px;
+            height: 16px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            z-index: 11;
+        }
+
+        .placed-image:hover .delete-btn {
+            display: flex;
+        }
+
+        .delete-btn:hover {
+            background: #cc0000;
+            transform: scale(1.1);
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar h2 {
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .drop-zone-hint {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone-hint.drag-over {
+            border-color: #28a745;
+            background-color: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+        }
+
+        .image-list {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            flex: 1;
+            overflow-y: auto;
+            max-height: 500px;
+            padding: 5px;
+        }
+
+        .image-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .image-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .image-list::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .source-image {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: grab;
+            transition: all 0.2s ease;
+            border: 2px solid #e0e0e0;
+        }
+
+        .source-image:hover {
+            transform: scale(1.08);
+            border-color: #2196F3;
+            box-shadow: 0 6px 16px rgba(33, 150, 243, 0.3);
+        }
+
+        .source-image:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #333;
+            border: 2px solid #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+            border-color: #2196F3;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .title {
+            color: white;
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.8);
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                padding: 10px;
+            }
+            
+            .sidebar {
+                width: 100%;
+                order: -1;
+            }
+            
+            .template-area {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-area">
+        <div class="title">Image Template Builder</div>
+        <div class="subtitle">Drag images from the sidebar to create your custom layout</div>
+        
+        <div class="template-container">
+            <div class="template-area" id="templateArea"></div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <h2>Image Library</h2>
+        
+        <div class="controls">
+            <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+                Add Images
+            </button>
+            <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">
+                Load Folder
+            </button>
+            <button class="btn btn-secondary" onclick="clearTemplate()">
+                Clear All
+            </button>
+            <button class="btn btn-primary" onclick="saveAsImage()">
+                Save as Image
+            </button>
+        </div>
+
+        <input type="file" id="fileInput" class="file-input" multiple accept="image/*" onchange="addImages(event)">
+        <input type="file" id="folderInput" class="file-input" webkitdirectory multiple onchange="loadFolder(event)">
+        
+        <div class="drop-zone-hint" id="dropZoneHint">
+            💡 Tip: Use "Load Folder" to auto-load images on each visit, or drag images here
+        </div>
+        
+        <div class="image-list" id="imageList">
+            <!-- Sample images will be added here -->
+        </div>
+    </div>
+
+    <script>
+        let draggedElement = null;
+        let isDragging = false;
+        let isResizing = false;
+        let currentElement = null;
+        let startX, startY, startWidth, startHeight;
+        let imageCounter = 0;
+        let storedImages = [];
+
+        // Sample images for demonstration (will be replaced by stored images if available)
+        const sampleImages = [
+            
+        ];
+
+        // Load stored images from memory or use samples
+        function loadStoredImages() {
+            const imageList = document.getElementById('imageList');
+            
+            if (storedImages.length > 0) {
+                // Load stored images
+                storedImages.forEach((imageData) => {
+                    const img = document.createElement('img');
+                    img.src = imageData.src;
+                    img.className = 'source-image';
+                    img.draggable = true;
+                    img.dataset.src = imageData.src;
+                    img.title = imageData.name;
+                    imageList.appendChild(img);
+                });
+            } else {
+                // Load sample images if no stored images
+                initializeSampleImages();
+            }
+            
+            // Create the grid slots
+            createImageSlots();
+        }
+
+        // Create 4x26 grid of image slots
+        function createImageSlots() {
+            const templateArea = document.getElementById('templateArea');
+            templateArea.innerHTML = ''; // Clear any existing content
+            
+            for (let i = 0; i < 104; i++) { // 4 * 26 = 104 slots
+                const slot = document.createElement('div');
+                slot.className = 'image-slot';
+                slot.dataset.slotId = i;
+                
+                const slotNumber = document.createElement('div');
+                slotNumber.className = 'slot-number';
+                slotNumber.textContent = i + 1;
+                slot.appendChild(slotNumber);
+                
+                templateArea.appendChild(slot);
+            }
+        }
+
+        // Initialize with sample images
+        function initializeSampleImages() {
+            const imageList = document.getElementById('imageList');
+            sampleImages.forEach((src, index) => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'source-image';
+                img.draggable = true;
+                img.dataset.src = src;
+                img.title = `Sample Image ${index + 1}`;
+                imageList.appendChild(img);
+            });
+        }
+
+        // Load folder and store images in memory
+        function loadFolder(event) {
+            const files = Array.from(event.target.files);
+            const imageFiles = files.filter(file => file.type.startsWith('image/'));
+            
+            if (imageFiles.length === 0) {
+                alert('No image files found in the selected folder.');
+                return;
+            }
+
+            // Clear existing images
+            const imageList = document.getElementById('imageList');
+            imageList.innerHTML = '';
+            storedImages = [];
+
+            // Process and store images
+            let processedCount = 0;
+            imageFiles.forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageData = {
+                        src: e.target.result,
+                        name: file.name
+                    };
+                    storedImages.push(imageData);
+
+                    const img = document.createElement('img');
+                    img.src = imageData.src;
+                    img.className = 'source-image';
+                    img.draggable = true;
+                    img.dataset.src = imageData.src;
+                    img.title = imageData.name;
+                    imageList.appendChild(img);
+
+                    processedCount++;
+                    if (processedCount === imageFiles.length) {
+                        updateDropZoneHint();
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateDropZoneHint() {
+            const dropHint = document.getElementById('dropZoneHint');
+            if (storedImages.length > 0) {
+                dropHint.innerHTML = `✅ ${storedImages.length} images loaded and ready! Drag them onto the template.`;
+                dropHint.style.background = '#d4edda';
+                dropHint.style.borderColor = '#c3e6cb';
+                dropHint.style.color = '#155724';
+            }
+        }
+
+        // Add custom images
+        function addImages(event) {
+            const files = event.target.files;
+            addImagesToLibrary(Array.from(files));
+        }
+
+        function addImagesToLibrary(files) {
+            const imageList = document.getElementById('imageList');
+            
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const imageData = {
+                            src: e.target.result,
+                            name: file.name
+                        };
+                        
+                        // Add to stored images if not already there
+                        if (!storedImages.some(img => img.name === file.name)) {
+                            storedImages.push(imageData);
+                        }
+
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'source-image';
+                        img.draggable = true;
+                        img.dataset.src = e.target.result;
+                        img.title = file.name;
+                        imageList.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Drag and drop functionality
+        document.addEventListener('dragstart', function(e) {
+            if (e.target.classList.contains('source-image')) {
+                draggedElement = e.target;
+                e.dataTransfer.effectAllowed = 'copy';
+            }
+        });
+
+        document.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            const templateArea = document.getElementById('templateArea');
+            const sidebar = document.querySelector('.sidebar');
+            const dropHint = document.getElementById('dropZoneHint');
+            
+            if (e.target.classList.contains('image-slot')) {
+                e.target.classList.add('drag-over');
+            } else if (e.target === templateArea || templateArea.contains(e.target)) {
+                templateArea.classList.add('drag-over');
+            }
+            
+            if (sidebar.contains(e.target) || e.target === sidebar) {
+                dropHint.classList.add('drag-over');
+            }
+        });
+
+        document.addEventListener('dragleave', function(e) {
+            const templateArea = document.getElementById('templateArea');
+            const sidebar = document.querySelector('.sidebar');
+            const dropHint = document.getElementById('dropZoneHint');
+            
+            // Remove drag-over from slots
+            document.querySelectorAll('.image-slot.drag-over').forEach(slot => {
+                slot.classList.remove('drag-over');
+            });
+            
+            if (!templateArea.contains(e.relatedTarget)) {
+                templateArea.classList.remove('drag-over');
+            }
+            
+            if (!sidebar.contains(e.relatedTarget)) {
+                dropHint.classList.remove('drag-over');
+            }
+        });
+
+        document.addEventListener('drop', function(e) {
+            e.preventDefault();
+            const templateArea = document.getElementById('templateArea');
+            const sidebar = document.querySelector('.sidebar');
+            templateArea.classList.remove('drag-over');
+            
+            // Remove drag-over from all slots
+            document.querySelectorAll('.image-slot.drag-over').forEach(slot => {
+                slot.classList.remove('drag-over');
+            });
+            
+            // Handle file drops from computer
+            if (e.dataTransfer.files.length > 0) {
+                const files = Array.from(e.dataTransfer.files);
+                const imageFiles = files.filter(file => file.type.startsWith('image/'));
+                
+                if (imageFiles.length > 0) {
+                    // If dropped on sidebar, add to image library
+                    if (sidebar.contains(e.target) || e.target === sidebar) {
+                        addImagesToLibrary(imageFiles);
+                    }
+                    // If dropped on a slot, place in that slot
+                    else if (e.target.classList.contains('image-slot')) {
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            placeImageInSlot(event.target.result, e.target);
+                        };
+                        reader.readAsDataURL(imageFiles[0]); // Use first file
+                    }
+                }
+                return;
+            }
+            
+            // Handle dragging from sidebar
+            if (draggedElement) {
+                if (e.target.classList.contains('image-slot')) {
+                    placeImageInSlot(draggedElement.dataset.src, e.target);
+                }
+            }
+            draggedElement = null;
+        });
+
+        function placeImageInSlot(src, slot) {
+            // Remove existing image if slot is occupied
+            if (slot.classList.contains('occupied')) {
+                const existingImage = slot.querySelector('.placed-image');
+                if (existingImage) {
+                    existingImage.remove();
+                }
+            }
+            
+            // Create new image element
+            const placedImage = document.createElement('div');
+            placedImage.className = 'placed-image';
+            
+            const img = document.createElement('img');
+            img.src = src;
+            img.draggable = false;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.onclick = function(e) {
+                e.stopPropagation();
+                placedImage.remove();
+                slot.classList.remove('occupied');
+                // Remove slot number display
+                const slotNumber = slot.querySelector('.slot-number');
+                if (slotNumber) slotNumber.style.display = 'block';
+            };
+            
+            placedImage.appendChild(img);
+            placedImage.appendChild(deleteBtn);
+            slot.appendChild(placedImage);
+            slot.classList.add('occupied');
+            
+            // Hide slot number when occupied
+            const slotNumber = slot.querySelector('.slot-number');
+            if (slotNumber) slotNumber.style.display = 'none';
+            
+            // Make image draggable between slots
+            makeSlotDraggable(placedImage, slot);
+        }
+
+        function makeSlotDraggable(imageElement, currentSlot) {
+            let isDragging = false;
+            
+            imageElement.addEventListener('mousedown', function(e) {
+                if (e.target.classList.contains('delete-btn')) return;
+                
+                isDragging = true;
+                const imageSrc = imageElement.querySelector('img').src;
+                
+                // Create a temporary draggedElement for slot-to-slot dragging
+                draggedElement = { dataset: { src: imageSrc } };
+                
+                // Remove from current slot
+                imageElement.remove();
+                currentSlot.classList.remove('occupied');
+                const slotNumber = currentSlot.querySelector('.slot-number');
+                if (slotNumber) slotNumber.style.display = 'block';
+                
+                e.preventDefault();
+                
+                // Add mouse move listener to handle slot highlighting
+                document.addEventListener('mousemove', handleSlotDrag);
+                document.addEventListener('mouseup', stopSlotDrag);
+            });
+            
+            function handleSlotDrag(e) {
+                if (!isDragging) return;
+                
+                // Remove previous highlights
+                document.querySelectorAll('.image-slot.drag-over').forEach(slot => {
+                    slot.classList.remove('drag-over');
+                });
+                
+                // Highlight current slot
+                const elementUnder = document.elementFromPoint(e.clientX, e.clientY);
+                if (elementUnder && elementUnder.classList.contains('image-slot')) {
+                    elementUnder.classList.add('drag-over');
+                }
+            }
+            
+            function stopSlotDrag(e) {
+                if (!isDragging) return;
+                isDragging = false;
+                
+                // Remove highlights
+                document.querySelectorAll('.image-slot.drag-over').forEach(slot => {
+                    slot.classList.remove('drag-over');
+                });
+                
+                // Find target slot
+                const elementUnder = document.elementFromPoint(e.clientX, e.clientY);
+                if (elementUnder && elementUnder.classList.contains('image-slot')) {
+                    placeImageInSlot(draggedElement.dataset.src, elementUnder);
+                } else {
+                    // If not dropped on a slot, put it back in original slot
+                    placeImageInSlot(draggedElement.dataset.src, currentSlot);
+                }
+                
+                draggedElement = null;
+                document.removeEventListener('mousemove', handleSlotDrag);
+                document.removeEventListener('mouseup', stopSlotDrag);
+            }
+        }
+
+        function clearTemplate() {
+            const slots = document.querySelectorAll('.image-slot');
+            slots.forEach(slot => {
+                const placedImage = slot.querySelector('.placed-image');
+                if (placedImage) {
+                    placedImage.remove();
+                }
+                slot.classList.remove('occupied');
+                const slotNumber = slot.querySelector('.slot-number');
+                if (slotNumber) slotNumber.style.display = 'block';
+            });
+        }
+
+        async function saveAsImage() {
+            const templateArea = document.getElementById('templateArea');
+            
+            if (templateArea.children.length === 0) {
+                alert('Please add some images to your template first!');
+                return;
+            }
+            
+            try {
+                // Hide interactive elements before capture
+                const deleteButtons = templateArea.querySelectorAll('.delete-btn');
+                const resizeHandles = templateArea.querySelectorAll('.resize-handle');
+                
+                deleteButtons.forEach(btn => btn.style.display = 'none');
+                resizeHandles.forEach(handle => handle.style.display = 'none');
+                
+                // Capture the template area
+                const canvas = await html2canvas(templateArea, {
+                    backgroundColor: '#ffffff',
+                    scale: 2, // Higher quality
+                    useCORS: true,
+                    allowTaint: true
+                });
+                
+                // Create download link
+                const link = document.createElement('a');
+                link.download = 'template_' + new Date().getTime() + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                // Restore interactive elements
+                deleteButtons.forEach(btn => btn.style.display = '');
+                resizeHandles.forEach(handle => handle.style.display = '');
+                
+            } catch (error) {
+                console.error('Error saving image:', error);
+                alert('Error saving image. Please try again.');
+            }
+        }
+
+        // Initialize the application
+        loadStoredImages();
+    </script>
+</body>
+</html>
